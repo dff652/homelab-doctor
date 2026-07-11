@@ -6,6 +6,7 @@ ROOT_DIR=$(CDPATH='' cd -- "${SELF_DIR}/.." && pwd)
 
 . "${ROOT_DIR}/lib/common.sh"
 . "${ROOT_DIR}/lib/config.sh"
+. "${ROOT_DIR}/lib/doctor.sh"
 
 VERSION=$(sed -n '1p' "${ROOT_DIR}/VERSION" 2>/dev/null)
 CONFIG_FILE="${HOMELAB_DOCTOR_CONFIG:-${ROOT_DIR}/config/local.conf}"
@@ -16,12 +17,18 @@ homelab-doctor ${VERSION}
 
 用法：
   homelab-doctor [--config FILE] config validate
+  homelab-doctor [--config FILE] doctor dns
+  homelab-doctor [--config FILE] doctor mihomo
+  homelab-doctor [--config FILE] doctor openvpn
   homelab-doctor [--config FILE] doctor router
   homelab-doctor version
 
 命令：
   config validate   校验配置，不连接任何设备
-  doctor router     通过 SSH 流式执行 OpenWrt 只读探针
+  doctor dns        诊断 DNS 与 split-DNS
+  doctor mihomo     诊断 OpenClash/Mihomo 运行态与规则
+  doctor openvpn    诊断 OpenVPN DNS 下发与路由
+  doctor router     通过一次 SSH 聚合所有只读模块
   version           显示版本
 EOF
 }
@@ -56,16 +63,10 @@ case "${COMMAND}:${SUBCOMMAND}" in
             exit 1
         fi
         ;;
-    doctor:router)
+    doctor:dns|doctor:mihomo|doctor:openvpn|doctor:router)
         hd_load_config "$CONFIG_FILE" || exit 1
         hd_validate_config || exit 1
-
-        hd_heading "连接 ${ROUTER_USER}@${ROUTER_HOST} 执行只读探针"
-        ssh -o BatchMode=yes \
-            -o "ConnectTimeout=${SSH_CONNECT_TIMEOUT}" \
-            "${ROUTER_USER}@${ROUTER_HOST}" \
-            "DNS_SERVER='${DNS_SERVER}' SPLIT_DOMAIN='${SPLIT_DOMAIN}' SPLIT_EXPECTED_IP='${SPLIT_EXPECTED_IP}' SERVICE_URL='${SERVICE_URL}' DIRECT_DOMAIN_SUFFIX='${DIRECT_DOMAIN_SUFFIX}' LAN_CIDR='${LAN_CIDR}' VPN_DNS='${VPN_DNS}' VPN_SUBNET='${VPN_SUBNET}' sh -s" \
-            < "${ROOT_DIR}/probes/openwrt/network.sh"
+        hd_doctor_remote "$SUBCOMMAND"
         ;;
     *)
         usage >&2

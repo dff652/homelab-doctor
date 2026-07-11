@@ -1,0 +1,5 @@
+rules:
+  - DOMAIN-SUFFIX,nas-vendor.example,DIRECT
+  - IP-CIDR,192.0.2.0/24,DIRECT,no-resolve
+fake-ip-filter:
+  - +.nas-vendor.example
