@@ -22,16 +22,18 @@ bin/homelab-doctor --config config/local.conf config validate
 bin/homelab-doctor --config config/local.conf doctor dns
 bin/homelab-doctor --config config/local.conf doctor mihomo
 bin/homelab-doctor --config config/local.conf doctor openvpn
+bin/homelab-doctor --config config/local.conf doctor firewall
 bin/homelab-doctor --config config/local.conf doctor router
 ```
 
-配置使用简单 `KEY=value` 格式，但不会被 Shell `source`；未知配置项和不安全字符会被拒绝。
+配置使用简单 `KEY=value` 格式，但不会被 Shell `source`；未知配置项和不安全字符会被拒绝。单模块命令只校验自身所需配置，避免 `doctor dns` 因缺少 VPN 参数失败。
 
 ## 诊断模块
 
 - `dns`：AdGuard Home、DNS 53与 split-DNS 期望答案；
 - `mihomo`：OpenClash/Mihomo进程、DNS 7874、域名/LAN DIRECT规则与 Fake-IP Filter；
 - `openvpn`：OpenVPN进程、DNS PUSH与客户端子网路由；
+- `firewall`：fw3/iptables 或 fw4/nftables 规则表与有效规则；
 - `system/service`：最终 HTTPS服务与 conntrack使用率；
 - `router`：通过一次 SSH stdin执行以上所有模块。
 
@@ -54,7 +56,7 @@ make check
 5. 只告警监控；
 6. 经显式确认、可回滚的修复模式。
 
-开发约束、交付模板与评审要求见 [开发指南](docs/development.md)，分阶段目标和验收条件见 [目标规划](docs/roadmap.md)。
+开发约束与交付模板见 [开发指南](docs/development.md)，分阶段目标见 [目标规划](docs/roadmap.md)，最终验收使用 [Review清单](docs/review-checklist.md)。
 
 ## 与私人 homelab 仓的边界
 
