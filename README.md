@@ -60,4 +60,4 @@ make check
 
 ## License
 
-许可证尚未选择；公开发布前必须补充。
+本项目采用 [Apache License 2.0](LICENSE)。
