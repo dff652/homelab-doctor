@@ -14,6 +14,7 @@ OpenWrt/BusyBox 探针
   ├─ dns：DNS / split-DNS
   ├─ mihomo：OpenClash运行态、DIRECT与 Fake-IP Filter
   ├─ openvpn：路由与 DNS PUSH
+  ├─ firewall：fw3/iptables 或 fw4/nftables 规则存在性
   └─ system/service：最终服务连通性与 conntrack
 ```
 
@@ -21,8 +22,8 @@ OpenWrt/BusyBox 探针
 
 ## 模块与执行协议
 
-- `doctor dns`、`doctor mihomo`、`doctor openvpn` 只拼装对应模块；
-- `doctor router` 按 DNS → Mihomo → OpenVPN → system/service 顺序聚合；
+- `doctor dns`、`doctor mihomo`、`doctor openvpn`、`doctor firewall` 只拼装对应模块；
+- `doctor router` 按 DNS → Mihomo → OpenVPN → firewall → system/service 顺序聚合；
 - 公共层和模块只定义 POSIX Shell函数，控制端在脚本末尾追加入口调用；
 - 所有模块共享 `[OK]`、`[WARN]`、`[!]` 计数和最终摘要；
 - `[!]` 使远程脚本返回非零，仅有 `[WARN]` 时返回零；
