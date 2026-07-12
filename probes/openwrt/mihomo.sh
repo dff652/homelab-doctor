@@ -10,8 +10,12 @@ probe_mihomo() {
         fail '未发现 OpenClash/Mihomo 核心进程'
     fi
 
-    if port_is_listening 7874; then
+    port_is_listening 7874
+    port_status=$?
+    if [ "$port_status" -eq 0 ]; then
         ok 'OpenClash DNS 端口 7874 正在监听'
+    elif [ "$port_status" -eq 2 ]; then
+        warn '缺少 netstat/ss，无法检查端口监听'
     else
         fail 'OpenClash DNS 端口 7874 未监听'
     fi
