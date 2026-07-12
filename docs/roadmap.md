@@ -64,6 +64,34 @@
 
 ## 0.4.0-dev：结构化结果
 
+### 私有环境交叉评审结论（2026-07-12，按事故史核对覆盖度）
+
+背景：以维护者私有环境近期真实事故对照各模块，发现当前探针以"配置存在性"为主，
+对"配置正确但运行态故障"的场景覆盖不足。按优先级：
+
+- [ ] **P0 修复**：`probes/openwrt/mihomo.sh` 端口检查未处理 `port_is_listening`
+  返回 2（缺 netstat/ss）的能力缺失分支，被误判为 `[!]`；`dns.sh` 已正确降级
+  `[WARN]`，两处行为需一致，并补缺命令 fixture 用例。
+- [ ] **P0 探针：代理数据面金丝雀**。经代理路径请求一个稳定 204/200 端点，
+  对"DNS 能返回 Fake-IP 但 TCP/HTTP 超时"输出 `[!]`——这是"DNS 活着、
+  数据面卡死"型故障的判定式，当前 system 模块只测内网服务，无法发现。
+- [ ] **P0 探针：运行时 DNS 行为断言**。用 Mihomo DNS 端口实测
+  `DIRECT_DOMAIN_SUFFIX` 返回真实 IP 而非 Fake-IP 段；抓两类真实踩坑：
+  `store-fake-ip` 持久缓存令旧映射复活、Filter 通配写法（`*.` vs `+.`）
+  未被核心匹配。仅 grep 配置文本无法发现这两类问题。
+- [ ] **P1 探针：DNS 53 全链路金丝雀**。split 域名可能被前端 DNS 的本地改写
+  直接应答、不经过上游 Mihomo DNS；需另测一个公网域名经 53 的解析，
+  否则上游 DNS 挂死时 dns 模块仍全绿。
+- [ ] **P1**：firewall 模块增加对 Mihomo/OpenClash 专属链（nft chain /
+  TUN redirect 规则）的存在性检查，覆盖"代理劫持规则被冲掉"场景。
+- [ ] **P2：客户端模式**。在 LAN 主机本地运行（无 SSH），判定本机
+  (DNS, 网关) 组合是否配套——"DNS 指旁路由 + 网关走主路由"的 Fake-IP
+  黑洞组合是客户端侧最高频故障，路由器侧探针无法发现。
+- [ ] **P2**：service 模块增加"期望 IP 在位"检查（ARP/TCP 探测配置的服务 IP），
+  覆盖 macvlan/容器重启后 IP 漂移导致的入口失效。
+- [ ] 杂项：`VERSION` 与 README 仍为 0.2.0-dev，与本文件 0.3.0-dev 基线漂移，
+  发布时对齐。
+
 ### 评审遗留（0.3.0 评审 warn，优先处理）
 
 - [ ] 扩充 `scripts/check-sensitive.sh` 覆盖面：大小写不敏感匹配、YAML/JSON 冒号分隔的 secret 赋值、`ss://`/`hysteria2://`/`tuic://` 等代理协议、`ghp_`/`AIza`/URL 内嵌凭据等令牌形式；
