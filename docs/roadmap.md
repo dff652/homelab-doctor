@@ -57,7 +57,7 @@
 - [x] GitHub Actions 使用最小权限；
 - [x] CI只使用仓库脱敏数据，不配置真实 SSH凭据；
 - [x] 本地 `make check` 与 CI入口一致；
-- [ ] main分支合并前要求 CI通过（需在 GitHub 仓库设置 branch protection）。
+- [x] main分支合并前要求 CI通过（branch protection 已启用：必需检查 make check，含管理员）。
 
 ## 0.4.0-dev：结构化结果
 
