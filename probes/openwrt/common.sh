@@ -25,7 +25,14 @@ has_cmd() {
 }
 
 port_is_listening() {
-    netstat -ln 2>/dev/null | grep -Eq "[:.]${1}[[:space:]]"
+    if has_cmd netstat; then
+        netstat -ln 2>/dev/null | grep -Eq "[:.]${1}[[:space:]]"
+    elif has_cmd ss; then
+        ss -ln 2>/dev/null | grep -Eq "[:.]${1}[[:space:]]"
+    else
+        # 能力缺失返回 2，调用方应降级为 WARN 而非 FAIL。
+        return 2
+    fi
 }
 
 resolve_a() {

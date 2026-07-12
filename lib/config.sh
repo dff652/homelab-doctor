@@ -97,29 +97,162 @@ hd_validate_token() {
     fi
 }
 
+# 若字段非空则按规则校验；空值跳过（用于可选字段）。
+hd_validate_token_if_set() {
+    label="$1"
+    value="$2"
+    pattern="$3"
+
+    [ -z "$value" ] && return 0
+    hd_validate_token "$label" "$value" "$pattern"
+}
+
+# 诊断目标所需的配置键（空格分隔）。
+# all / 空：完整配置（config validate 与 doctor router）。
+hd_required_keys_for() {
+    target="${1:-all}"
+    case "$target" in
+        dns)
+            printf '%s\n' 'ROUTER_HOST ROUTER_USER SSH_CONNECT_TIMEOUT DNS_SERVER SPLIT_DOMAIN SPLIT_EXPECTED_IP'
+            ;;
+        mihomo)
+            printf '%s\n' 'ROUTER_HOST ROUTER_USER SSH_CONNECT_TIMEOUT DIRECT_DOMAIN_SUFFIX LAN_CIDR'
+            ;;
+        openvpn)
+            printf '%s\n' 'ROUTER_HOST ROUTER_USER SSH_CONNECT_TIMEOUT VPN_DNS VPN_SUBNET'
+            ;;
+        firewall)
+            printf '%s\n' 'ROUTER_HOST ROUTER_USER SSH_CONNECT_TIMEOUT'
+            ;;
+        router|all)
+            printf '%s\n' 'ROUTER_HOST ROUTER_USER SSH_CONNECT_TIMEOUT DNS_SERVER SPLIT_DOMAIN SPLIT_EXPECTED_IP SERVICE_URL DIRECT_DOMAIN_SUFFIX LAN_CIDR VPN_DNS VPN_SUBNET'
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+# 远程探针环境变量键（不含 SSH 连接参数）。
+hd_probe_env_keys_for() {
+    target="${1:-}"
+    case "$target" in
+        dns)
+            printf '%s\n' 'DNS_SERVER SPLIT_DOMAIN SPLIT_EXPECTED_IP'
+            ;;
+        mihomo)
+            printf '%s\n' 'DIRECT_DOMAIN_SUFFIX LAN_CIDR'
+            ;;
+        openvpn)
+            printf '%s\n' 'VPN_DNS VPN_SUBNET'
+            ;;
+        firewall)
+            # 防火墙模块不依赖本地诊断配置项。
+            :
+            ;;
+        router)
+            printf '%s\n' 'DNS_SERVER SPLIT_DOMAIN SPLIT_EXPECTED_IP SERVICE_URL DIRECT_DOMAIN_SUFFIX LAN_CIDR VPN_DNS VPN_SUBNET'
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+hd_config_value() {
+    case "$1" in
+        ROUTER_HOST) printf '%s' "$ROUTER_HOST" ;;
+        ROUTER_USER) printf '%s' "$ROUTER_USER" ;;
+        SSH_CONNECT_TIMEOUT) printf '%s' "$SSH_CONNECT_TIMEOUT" ;;
+        DNS_SERVER) printf '%s' "$DNS_SERVER" ;;
+        SPLIT_DOMAIN) printf '%s' "$SPLIT_DOMAIN" ;;
+        SPLIT_EXPECTED_IP) printf '%s' "$SPLIT_EXPECTED_IP" ;;
+        SERVICE_URL) printf '%s' "$SERVICE_URL" ;;
+        DIRECT_DOMAIN_SUFFIX) printf '%s' "$DIRECT_DOMAIN_SUFFIX" ;;
+        LAN_CIDR) printf '%s' "$LAN_CIDR" ;;
+        VPN_DNS) printf '%s' "$VPN_DNS" ;;
+        VPN_SUBNET) printf '%s' "$VPN_SUBNET" ;;
+        *) return 1 ;;
+    esac
+}
+
+hd_validate_key() {
+    key="$1"
+    value=$(hd_config_value "$key")
+
+    case "$key" in
+        ROUTER_HOST)
+            hd_validate_token ROUTER_HOST "$value" '^[A-Za-z0-9._:-]+$'
+            ;;
+        ROUTER_USER)
+            hd_validate_token ROUTER_USER "$value" '^[A-Za-z_][A-Za-z0-9_-]*$'
+            ;;
+        SSH_CONNECT_TIMEOUT)
+            hd_validate_token SSH_CONNECT_TIMEOUT "$value" '^[0-9]+$'
+            ;;
+        DNS_SERVER)
+            hd_validate_token DNS_SERVER "$value" '^[A-Za-z0-9._:-]+$'
+            ;;
+        SPLIT_DOMAIN)
+            hd_validate_token SPLIT_DOMAIN "$value" '^[A-Za-z0-9.-]+$'
+            ;;
+        SPLIT_EXPECTED_IP)
+            hd_validate_token SPLIT_EXPECTED_IP "$value" '^[0-9.]+$' || return 1
+            hd_is_ipv4 "$value" || {
+                printf '[!] SPLIT_EXPECTED_IP 不是有效 IPv4：%s\n' "$value" >&2
+                return 1
+            }
+            ;;
+        SERVICE_URL)
+            hd_validate_token SERVICE_URL "$value" '^https?://[A-Za-z0-9._:/-]+$'
+            ;;
+        DIRECT_DOMAIN_SUFFIX)
+            hd_validate_token DIRECT_DOMAIN_SUFFIX "$value" '^[A-Za-z0-9.-]+$'
+            ;;
+        LAN_CIDR)
+            hd_validate_token LAN_CIDR "$value" '^[0-9.]+/[0-9]+$'
+            ;;
+        VPN_DNS)
+            hd_validate_token VPN_DNS "$value" '^[0-9.]+$' || return 1
+            hd_is_ipv4 "$value" || {
+                printf '[!] VPN_DNS 不是有效 IPv4：%s\n' "$value" >&2
+                return 1
+            }
+            ;;
+        VPN_SUBNET)
+            hd_validate_token VPN_SUBNET "$value" '^[0-9.]+/[0-9]+$'
+            ;;
+        *)
+            printf '[!] 内部错误：未知校验键 %s\n' "$key" >&2
+            return 1
+            ;;
+    esac
+}
+
+# 校验给定目标所需配置。target=all 表示完整配置（config validate）。
+# 已设置但不属于必填集合的字段若非空，仍做格式校验以拒绝注入字符。
 hd_validate_config() {
+    target="${1:-all}"
     errors=0
-
-    hd_validate_token ROUTER_HOST "$ROUTER_HOST" '^[A-Za-z0-9._:-]+$' || errors=$((errors + 1))
-    hd_validate_token ROUTER_USER "$ROUTER_USER" '^[A-Za-z_][A-Za-z0-9_-]*$' || errors=$((errors + 1))
-    hd_validate_token SSH_CONNECT_TIMEOUT "$SSH_CONNECT_TIMEOUT" '^[0-9]+$' || errors=$((errors + 1))
-    hd_validate_token DNS_SERVER "$DNS_SERVER" '^[A-Za-z0-9._:-]+$' || errors=$((errors + 1))
-    hd_validate_token SPLIT_DOMAIN "$SPLIT_DOMAIN" '^[A-Za-z0-9.-]+$' || errors=$((errors + 1))
-    hd_validate_token SPLIT_EXPECTED_IP "$SPLIT_EXPECTED_IP" '^[0-9.]+$' || errors=$((errors + 1))
-    hd_validate_token SERVICE_URL "$SERVICE_URL" '^https?://[A-Za-z0-9._:/-]+$' || errors=$((errors + 1))
-    hd_validate_token DIRECT_DOMAIN_SUFFIX "$DIRECT_DOMAIN_SUFFIX" '^[A-Za-z0-9.-]+$' || errors=$((errors + 1))
-    hd_validate_token LAN_CIDR "$LAN_CIDR" '^[0-9.]+/[0-9]+$' || errors=$((errors + 1))
-    hd_validate_token VPN_DNS "$VPN_DNS" '^[0-9.]+$' || errors=$((errors + 1))
-    hd_validate_token VPN_SUBNET "$VPN_SUBNET" '^[0-9.]+/[0-9]+$' || errors=$((errors + 1))
-
-    hd_is_ipv4 "$SPLIT_EXPECTED_IP" || {
-        printf '[!] SPLIT_EXPECTED_IP 不是有效 IPv4：%s\n' "$SPLIT_EXPECTED_IP" >&2
-        errors=$((errors + 1))
+    required=$(hd_required_keys_for "$target") || {
+        printf '[!] 未知校验目标：%s\n' "$target" >&2
+        return 1
     }
-    hd_is_ipv4 "$VPN_DNS" || {
-        printf '[!] VPN_DNS 不是有效 IPv4：%s\n' "$VPN_DNS" >&2
-        errors=$((errors + 1))
-    }
+
+    for key in $required; do
+        hd_validate_key "$key" || errors=$((errors + 1))
+    done
+
+    # 非必填但已填写的白名单字段：仍拒绝非法/注入值。
+    all_keys='ROUTER_HOST ROUTER_USER SSH_CONNECT_TIMEOUT DNS_SERVER SPLIT_DOMAIN SPLIT_EXPECTED_IP SERVICE_URL DIRECT_DOMAIN_SUFFIX LAN_CIDR VPN_DNS VPN_SUBNET'
+    for key in $all_keys; do
+        case " $required " in
+            *" $key "*) continue ;;
+        esac
+        value=$(hd_config_value "$key")
+        [ -z "$value" ] && continue
+        hd_validate_key "$key" || errors=$((errors + 1))
+    done
 
     [ "$errors" -eq 0 ]
 }

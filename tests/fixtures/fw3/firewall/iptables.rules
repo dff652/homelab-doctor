@@ -1,0 +1,11 @@
+-P INPUT ACCEPT
+-P FORWARD DROP
+-P OUTPUT ACCEPT
+-N zone_lan_forward
+-N zone_wan_input
+-A INPUT -i lo -j ACCEPT
+-A INPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A FORWARD -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A FORWARD -j zone_lan_forward
+-A zone_lan_forward -j ACCEPT
+-A zone_wan_input -j REJECT
