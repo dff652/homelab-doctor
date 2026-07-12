@@ -1,18 +1,21 @@
 # 目标规划
 
-## 当前基线：0.2.0-dev
+## 当前基线：0.3.0-dev
 
-- DNS、Mihomo、OpenVPN、system/service 模块已拆分；
+- DNS、Mihomo、OpenVPN、system/service、firewall 模块已拆分；
 - `doctor router` 通过一次 SSH聚合模块；
-- fixture/stub 覆盖 `[OK]`、`[WARN]`、`[!]`；
-- OpenWrt/GL.iNet 真实设备只读基线已验证；
+- 单模块命令只校验自身必填配置；
+- 退出状态区分诊断故障、配置错误与 SSH传输失败（0/1/2/3）；
+- GitHub Actions CI 与 main branch protection 已启用；
+- fixture/stub 覆盖 `[OK]`、`[WARN]`、`[!]`、fw3/fw4 与缺命令场景；
+- OpenWrt/GL.iNet 真实设备只读基线在 0.2.0 验证；0.3.0 新模块的真机只读验证待维护者执行；
 - 项目采用 Apache-2.0。
 
 ## 0.3.0-dev：稳定模块契约
 
 在增加结构化输出前，先完成以下任务。
 
-> 实现状态：下列 P0/P1 项已在开发分支落地；合并后由维护者执行最终安全、兼容性、实机与发布检查。
+> 实现状态：下列 P0/P1 项已全部合并进 main；真机只读验证与发布检查由维护者执行。评审遗留的低优先级改进见 0.4.0-dev。
 
 ### P0：按命令校验配置 — 已实现
 
@@ -60,6 +63,15 @@
 - [x] main分支合并前要求 CI通过（branch protection 已启用：必需检查 make check，含管理员）。
 
 ## 0.4.0-dev：结构化结果
+
+### 评审遗留（0.3.0 评审 warn，优先处理）
+
+- [ ] 扩充 `scripts/check-sensitive.sh` 覆盖面：大小写不敏感匹配、YAML/JSON 冒号分隔的 secret 赋值、`ss://`/`hysteria2://`/`tuic://` 等代理协议、`ghp_`/`AIza`/URL 内嵌凭据等令牌形式；
+- [ ] 远程环境组装（`lib/doctor.sh`）对值做统一单引号转义，纵深防御，不再仅依赖白名单正则单层防线；
+- [ ] 增加 SSH 超时独立测试用例，并断言 `ConnectTimeout` 参数实际传入 ssh；
+- [ ] system 探针 `curl -k`：提供证书校验开关，或在跳过校验时输出 `[WARN]` 标注。
+
+### 结构化输出
 
 - 在不破坏文本输出的前提下增加 JSON；
 - 定义模块、检查项、状态、证据和耗时字段；
